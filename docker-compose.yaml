@@ -1,0 +1,63 @@
+version: '3.7'
+
+services:
+  app:
+    container_name: FastAPI
+    build: 
+      context: ./backend
+      dockerfile: ./Dockerfile
+    volumes:
+      - ./backend:/var/www/html
+    ports:
+      - "9004:9004"
+    command: wait-for-it.sh mongo_db:27017 --timeout=30 -- uvicorn main:app --reload --host 0.0.0.0 --port 9004
+    environment:
+      MONGO_DATABASE_NAME: mongodb
+      MONGO_DATABASE_USER: root
+      MONGO_DATABASE_PASSWORD: root
+      MONGO_DATABASE_CONTAINER_NAME: mongo_db
+      MONGO_DATABASE_PORT: 27017
+    networks:
+      - fastapi-mongo-network
+
+  mongodb:
+    container_name: mongo_db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: root
+    build:
+      context: ./mongo_db
+      dockerfile: ./Dockerfile
+    ports:
+      - "27017:27017"
+    tty: true
+    volumes:
+      - ./mongo_db/db:/data/db
+      - ./mongo_db/configdb:/data/configdb
+      - ./mongo_db/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js
+    networks:
+      - fastapi-mongo-network
+  
+  mongo-express:
+    container_name: mongo_express
+    build:
+      context: ./mongo_express
+      dockerfile: ./Dockerfile
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: root
+      ME_CONFIG_MONGODB_SERVER: mongo_db
+    ports:
+      - "8081:8081"
+    tty: true
+    command: wait-for-it.sh mongo_db:27017 --timeout=30 -- node app
+    restart: unless-stopped
+    networks:
+      - fastapi-mongo-network
+
+networks:
+  fastapi-mongo-network:
+    driver: bridge
+
+    
+
